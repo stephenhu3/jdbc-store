@@ -219,7 +219,7 @@ public class Store implements ActionListener {
 
 
 	/*
-	 * inserts a Item
+	 * Inserts an item
 	 */
 	private void insertItem() {
 		String upc;
@@ -228,19 +228,25 @@ public class Store implements ActionListener {
 		String taxable;
 		PreparedStatement ps;
 
+		System.out.println("\nItem relation current values:");
+		showItem();
+
 		try {
 			ps = con.prepareStatement("SELECT * FROM item WHERE upc = ?");
 
-			System.out.print("\nItem UPC: ");
+			System.out.print("\nEnter Item UPC to Insert: ");
 			upc = in.readLine();
+			while (upc.length() != 6) {
+				System.out.print("\nItem UPC must be 6 characters long.");
+				System.out.print("\nPlease Enter Item UPC Again: ");
+				upc = in.readLine();
+			}
 			ps.setString(1, upc);
 
 			int rowCount = ps.executeUpdate();
 			
 			if (rowCount > 0) {
-				System.out.println("\nItem " + upc + " already exists. Current values:");
-				showItem();
-				updateItem(upc);
+				System.out.println("\nItem " + upc + " already exists. Insertion cancelled.");
 				con.commit();
 				ps.close();
 				return;
@@ -250,21 +256,25 @@ public class Store implements ActionListener {
 
 			ps.setString(1, upc);
 
-			System.out.print("\nItem Selling Price: ");
+			System.out.print("\nEnter Item Selling Price: ");
 			sellingPrice = Float.parseFloat(in.readLine());
 			ps.setFloat(2, sellingPrice);
 
-			System.out.print("\nItem Stock: ");
+			System.out.print("\nEnter Item Stock: ");
 			stock = Integer.parseInt(in.readLine());
+			ps.setFloat(3, stock);
 
-			System.out.print("\nItem Taxable: ");
+			System.out.print("\nEnter Item Taxable: ");
 			taxable = in.readLine();
 			ps.setString(4, taxable);
 
 			ps.executeUpdate();
 			// commit work 
 			con.commit();
+			System.out.println("\nItem inserted.");
 			ps.close();
+			System.out.println("\nItem relation after insertion:");
+			showItem();
 		} catch (IOException e) {
 			System.out.println("IOException!");
 		} catch (SQLException ex) {
@@ -279,77 +289,59 @@ public class Store implements ActionListener {
 		}
 	}
 
-	// TODO
 	/*
-	 * Deletes an item
+	 * Deletes an item if stock is zero
 	 */
 	private void deleteItem() {
-		int bid;
+		String upc;
 		PreparedStatement ps;
 
-		try {
-			ps = con.prepareStatement("DELETE FROM item WHERE upc = ?");
+		System.out.println("\nItem relation current values:");
+		showItem();
 
-			System.out.print("\nItem UPC: ");
-			bid = Integer.parseInt(in.readLine());
-			ps.setInt(1, bid);
+		try {
+			ps = con.prepareStatement("SELECT * FROM item WHERE upc = ?");
+
+			System.out.print("\nEnter Item UPC to Delete: ");
+			upc = in.readLine();
+			ps.setString(1, upc);
 
 			int rowCount = ps.executeUpdate();
-
-			if (rowCount == 0) {
-				System.out.println("\nItem " + bid + " does not exist!");
-			}
-
-			con.commit();
-
-			ps.close();
-		} catch (IOException e) {
-			System.out.println("IOException!");
-		} catch (SQLException ex) {
-			System.out.println("Message: " + ex.getMessage());
-
-			try {
-				con.rollback();
-			} catch (SQLException ex2) {
-				System.out.println("Message: " + ex2.getMessage());
-				System.exit(-1);
-			}
-		}
-	}
-
-
-	/*
-	 * Updates the values of an item
-	 */
-	private void updateItem(String upc) {
-		float sellingPrice;
-		int stock;
-		String taxable;
-		PreparedStatement ps;
-
-		System.out.print("\nUpdating Item " + upc + ":");
-
-		try {
-			ps = con.prepareStatement("UPDATE item SET sellingPrice = ?, stock = ?, taxable = ? WHERE upc = ?");
 			
-			System.out.print("\nItem Selling Price: ");
-			sellingPrice = Float.parseFloat(in.readLine());
-			ps.setFloat(1, sellingPrice);
-
-			System.out.print("\nItem Stock: ");
-			stock = Integer.parseInt(in.readLine());
-			ps.setInt(2, stock);
-
-			System.out.print("\nItem Taxable: ");
-			taxable = in.readLine();
-			ps.setString(3, taxable);
-
-			ps.setString(4, upc);
-
+			if (rowCount == 0) {
+				System.out.println("\nItem " + upc + " does not exists. Deletion cancelled.");
+				con.commit();
+				ps.close();
+				return;
+			}
 			con.commit();
-			ps.close();
+			
+			ps = con.prepareStatement("SELECT * FROM item WHERE upc = ? AND stock != 0");
+			ps.setString(1, upc);
 
-			System.out.println("\nUpdated values:");
+			rowCount = ps.executeUpdate();
+			
+			if (rowCount > 0) {
+				System.out.println("\nItem " + upc + " stock is not empty. Deletion cancelled.");
+				con.commit();
+				ps.close();
+				return;
+			}
+			con.commit();
+
+			ps = con.prepareStatement("DELETE FROM itemPurchase WHERE upc = ?");
+			ps.setString(1, upc);
+			ps.executeUpdate();
+			con.commit();
+
+			ps = con.prepareStatement("DELETE FROM item WHERE upc = ?");
+			ps.setString(1, upc);
+			ps.executeUpdate();
+			con.commit();
+			
+			System.out.println("\nItem deleted.");
+			ps.close();
+			System.out.println("\nItem relation after deletion:");
 			showItem();
 		} catch (IOException e) {
 			System.out.println("IOException!");
@@ -364,7 +356,6 @@ public class Store implements ActionListener {
 			}
 		}
 	}
-
 
 	/*
 	 * Display information about items
@@ -406,16 +397,16 @@ public class Store implements ActionListener {
 				// simplified output formatting; truncation may occur
 
 				upc = rs.getString("upc");
-				System.out.printf("%-10.10s", upc);
+				System.out.printf("%-15s", upc);
 
 				sellingPrice = rs.getFloat("sellingPrice");
-				System.out.printf("%-20.20s", sellingPrice);
+				System.out.printf("%-15.2f", sellingPrice);
 
 				stock = rs.getInt("stock");
-				System.out.printf("%-20.20s", stock);
+				System.out.printf("%-15d", stock);
 
 				taxable = rs.getString("taxable");
-				System.out.printf("%-15.15s", taxable);
+				System.out.printf("%-15s\n", taxable);
 			}
 
 			// close the statement; 
