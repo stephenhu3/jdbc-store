@@ -229,7 +229,7 @@ public class Store implements ActionListener {
 		PreparedStatement ps;
 
 		try {
-			ps = con.prepareStatement("SELECT FROM item WHERE upc = ?");
+			ps = con.prepareStatement("SELECT * FROM item WHERE upc = ?");
 
 			System.out.print("\nItem UPC: ");
 			upc = in.readLine();
@@ -248,8 +248,6 @@ public class Store implements ActionListener {
 
 			ps = con.prepareStatement("INSERT INTO item VALUES (?,?,?,?)");
 
-			System.out.print("\nItem UPC: ");
-			upc = in.readLine();
 			ps.setString(1, upc);
 
 			System.out.print("\nItem Selling Price: ");
