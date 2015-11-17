@@ -183,7 +183,8 @@ public class Store implements ActionListener {
 				System.out.print("1.  Insert Item\n");
 				System.out.print("2.  Delete Item\n");
 				System.out.print("3.  Show Recent Textbook Top Sellers With Low Stock\n");
-				System.out.print("4.  Quit\n>> ");
+				System.out.print("4.  Show Recent Top Three Grossing Items\n");
+				System.out.print("5.  Quit\n>> ");
 
 				choice = Integer.parseInt(in.readLine());
 
@@ -200,6 +201,9 @@ public class Store implements ActionListener {
 						showTextbookInfo();
 						break;
 					case 4:
+						showTopGrossingInfo();
+						break;
+					case 5:
 						quit = true;
 				}
 			}
@@ -421,14 +425,6 @@ public class Store implements ActionListener {
 		}
 	}
 
-	// Write a short program to print out a list of course textbooks that satisfy the following criteria:
-	// (i) the total number of copies sold in the last week exceeded 50; and (ii) the remaining stock of
-	// the textbook has fallen below 10. For this part of the assignment, let us assume that today’s date
-	// is November 1, 2015, and “last week” corresponds to the period of October 25th to October 31st.
-	// For your output, print out the list of course textbooks that satisfy the criteria.
-
-	// use group by
-
 	/*
 	 * Display list of textbooks satisfying these conditions:
 	 * (i) the total number of copies sold in the last week exceeded 50 AND
@@ -441,29 +437,6 @@ public class Store implements ActionListener {
 		Statement stmt;
 		ResultSet rs;
 		PreparedStatement ps;
-		/*
-		CREATE VIEW recentBookSales AS
-		SELECT i.upc, i.quantity, i.t_id
-		FROM itemPurchase i, purchase p
-		WHERE i.t_id = p.t_id
-			AND p.purchaseDate BETWEEN TO_DATE('2015-10-25', 'YYYY-MM-DD') AND TO_DATE('2015-10-31', 'YYYY-MM-DD')
-		GROUP BY i.t_id, i.upc, i.quantity
-
-		CREATE VIEW topBookSales AS 
-		SELECT s.upc
-		FROM recentBookSales s, item e
-		WHERE e.upc = s.upc
-		GROUP BY s.upc
-		HAVING SUM(s.quantity) > 50.0;
-
-		SELECT b.upc, b.title, b.publisher
-		FROM book b, item e, topBookSales t
-		WHERE b.upc = t.upc
-		  AND t.upc = e.upc
-		  AND e.stock < 10
-		  AND b.flag_text = 'y';
-
-		*/
 
 		try {
 			ps = con.prepareStatement("DROP VIEW recentBookSales");	
@@ -546,6 +519,129 @@ public class Store implements ActionListener {
 
 				publisher = rs.getString("publisher");
 				System.out.printf("\n%-15s", publisher);
+			}
+
+			// close the statement; 
+			// the ResultSet will also be closed
+			stmt.close();
+		} catch (SQLException ex) {
+			System.out.println("Message: " + ex.getMessage());
+		}
+	}
+
+	/*
+	 * Display the top three items sold last week with respect to total sales amount
+	 */
+	private void showTopGrossingInfo() {
+		String upc;
+		float totalSales;
+		float sellingPrice;
+		int stock;
+		String taxable;
+		ResultSet rs;
+		Statement stmt;
+		PreparedStatement ps;
+
+		try {
+			ps = con.prepareStatement("DROP VIEW recentSales");	
+				
+			try {
+				ps.executeUpdate();
+			} catch (SQLException ex) {
+				con.commit();		
+			}
+
+			ps = con.prepareStatement(
+				"CREATE VIEW recentSales AS "
+				+ "SELECT i.upc, i.quantity, i.t_id "
+				+ "FROM itemPurchase i, purchase p "
+				+ "WHERE i.t_id = p.t_id "
+					+ "AND p.purchaseDate BETWEEN TO_DATE('2015-10-25', 'YYYY-MM-DD') AND TO_DATE('2015-10-31', 'YYYY-MM-DD') "
+				+ "GROUP BY i.t_id, i.upc, i.quantity"
+			);
+			ps.executeUpdate();
+			con.commit();
+			
+			ps = con.prepareStatement("DROP VIEW topGrossing");
+				
+			try {
+				ps.executeUpdate();
+			} catch (SQLException ex) {
+				con.commit();		
+			}
+
+			ps = con.prepareStatement(
+				"CREATE VIEW topGrossing AS "
+				+ "SELECT e.upc, e.sellingPrice * s.quantity AS amount_grossed "
+				+ "FROM recentSales s, item e "
+				+ "WHERE e.upc = s.upc "
+				+ "ORDER BY amount_grossed DESC "
+			);
+			ps.executeUpdate();
+			con.commit();
+
+			ps = con.prepareStatement("DROP VIEW topThreeGrossing");
+				
+			try {
+				ps.executeUpdate();
+			} catch (SQLException ex) {
+				con.commit();		
+			}
+
+			ps = con.prepareStatement(
+				"CREATE VIEW topThreeGrossing AS "
+				+ "SELECT * "
+				+ "FROM topGrossing "
+				+ "WHERE ROWNUM <= 3"
+			);
+			ps.executeUpdate();
+			con.commit();
+			
+			stmt = con.createStatement();
+
+			rs = stmt.executeQuery(
+				"SELECT t.amount_grossed AS totalSales, f.upc, f.sellingPrice, f.stock, f.taxable "
+				+ "FROM item f, topThreeGrossing t "
+				+ "WHERE f.upc = t.upc"
+			);
+
+			// get info on ResultSet
+			ResultSetMetaData rsmd = rs.getMetaData();
+
+			// get number of columns
+			int numCols = rsmd.getColumnCount();
+
+			System.out.println(" ");
+
+			// display column names;
+			for (int i = 0; i < numCols; i++) {
+				// get column name and print it
+
+				System.out.printf("%-15s", rsmd.getColumnName(i + 1));
+			}
+
+			System.out.println(" ");
+
+			while (rs.next()) {
+				// for display purposes get everything from Oracle 
+				// as a string
+
+				// simplified output formatting; truncation may occur
+
+				totalSales = rs.getFloat("totalSales");
+				System.out.printf("%-15.2f", totalSales);
+
+				upc = rs.getString("upc");
+				System.out.printf("%-15s", upc);
+
+				sellingPrice = rs.getFloat("sellingPrice");
+				System.out.printf("%-15.2f", sellingPrice);
+
+				stock = rs.getInt("stock");
+				System.out.printf("%-15d", stock);
+
+				taxable = rs.getString("taxable");
+				System.out.printf("\n%-15s", taxable);
 			}
 
 			// close the statement; 
