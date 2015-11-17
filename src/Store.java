@@ -182,7 +182,8 @@ public class Store implements ActionListener {
 				System.out.print("\n\nPlease choose one of the following: \n");
 				System.out.print("1.  Insert Item\n");
 				System.out.print("2.  Delete Item\n");
-				System.out.print("3.  Quit\n>> ");
+				System.out.print("3.  Show Recent Textbook Top Sellers With Low Stock\n");
+				System.out.print("4.  Quit\n>> ");
 
 				choice = Integer.parseInt(in.readLine());
 
@@ -196,6 +197,9 @@ public class Store implements ActionListener {
 						deleteItem();
 						break;
 					case 3:
+						showTextbookInfo();
+						break;
+					case 4:
 						quit = true;
 				}
 			}
@@ -417,8 +421,142 @@ public class Store implements ActionListener {
 		}
 	}
 
+	// Write a short program to print out a list of course textbooks that satisfy the following criteria:
+	// (i) the total number of copies sold in the last week exceeded 50; and (ii) the remaining stock of
+	// the textbook has fallen below 10. For this part of the assignment, let us assume that today’s date
+	// is November 1, 2015, and “last week” corresponds to the period of October 25th to October 31st.
+	// For your output, print out the list of course textbooks that satisfy the criteria.
+
+	// use group by
+
+	/*
+	 * Display list of textbooks satisfying these conditions:
+	 * (i) the total number of copies sold in the last week exceeded 50 AND
+	 * (ii) the remaining stock of the textbook has fallen below 10. 
+	 */
+	private void showTextbookInfo() {
+		String upc;
+		String title;
+		String publisher;
+		Statement stmt;
+		ResultSet rs;
+		PreparedStatement ps;
+		/*
+		CREATE VIEW recentBookSales AS
+		SELECT i.upc, i.quantity, i.t_id
+		FROM itemPurchase i, purchase p
+		WHERE i.t_id = p.t_id
+			AND p.purchaseDate BETWEEN TO_DATE('2015-10-25', 'YYYY-MM-DD') AND TO_DATE('2015-10-31', 'YYYY-MM-DD')
+		GROUP BY i.t_id, i.upc, i.quantity
+
+		CREATE VIEW topBookSales AS 
+		SELECT s.upc
+		FROM recentBookSales s, item e
+		WHERE e.upc = s.upc
+		GROUP BY s.upc
+		HAVING SUM(s.quantity) > 50.0;
+
+		SELECT b.upc, b.title, b.publisher
+		FROM book b, item e, topBookSales t
+		WHERE b.upc = t.upc
+		  AND t.upc = e.upc
+		  AND e.stock < 10
+		  AND b.flag_text = 'y';
+
+		*/
+
+		try {
+			ps = con.prepareStatement("DROP VIEW recentBookSales");	
+				
+			try {
+				ps.executeUpdate();
+			} catch (SQLException ex) {
+				con.commit();		
+			}
+
+			ps = con.prepareStatement(
+				"CREATE VIEW recentBookSales AS "
+				+ "SELECT i.upc, i.quantity, i.t_id "
+				+ "FROM itemPurchase i, purchase p "
+				+ "WHERE i.t_id = p.t_id "
+					+ "AND p.purchaseDate BETWEEN TO_DATE('2015-10-25', 'YYYY-MM-DD') AND TO_DATE('2015-10-31', 'YYYY-MM-DD') "
+				+ "GROUP BY i.t_id, i.upc, i.quantity"
+			);
+			ps.executeUpdate();
+			con.commit();
+			
+			ps = con.prepareStatement("DROP VIEW topBookSales");
+				
+			try {
+				ps.executeUpdate();
+			} catch (SQLException ex) {
+				con.commit();		
+			}
+
+			ps = con.prepareStatement(
+				"CREATE VIEW topBookSales AS "
+				+ "SELECT s.upc "
+				+ "FROM recentBookSales s, item e "
+				+ "WHERE e.upc = s.upc "
+				+ "GROUP BY s.upc "
+				+ "HAVING SUM(s.quantity) > 50.0"
+			);
+			ps.executeUpdate();
+			con.commit();
+			
+			stmt = con.createStatement();
+
+			rs = stmt.executeQuery(
+				"SELECT b.upc, b.title, b.publisher "
+				+ "FROM book b, item e, topBookSales t "
+				+ "WHERE b.upc = t.upc "
+				  + "AND t.upc = e.upc "
+				  + "AND e.stock < 10 "
+				  + "AND b.flag_text = 'y'"
+			);
+
+			// get info on ResultSet
+			ResultSetMetaData rsmd = rs.getMetaData();
+
+			// get number of columns
+			int numCols = rsmd.getColumnCount();
+
+			System.out.println(" ");
+
+			// display column names;
+			for (int i = 0; i < numCols; i++) {
+				// get column name and print it
+
+				System.out.printf("%-15s", rsmd.getColumnName(i + 1));
+			}
+
+			System.out.println(" ");
+
+			while (rs.next()) {
+				// for display purposes get everything from Oracle 
+				// as a string
+
+				// simplified output formatting; truncation may occur
+
+				upc = rs.getString("upc");
+				System.out.printf("%-15s", upc);
+
+				title = rs.getString("title");
+				System.out.printf("%-15s", title);
+
+				publisher = rs.getString("publisher");
+				System.out.printf("\n%-15s", publisher);
+			}
+
+			// close the statement; 
+			// the ResultSet will also be closed
+			stmt.close();
+		} catch (SQLException ex) {
+			System.out.println("Message: " + ex.getMessage());
+		}
+	}
 
 	public static void main(String args[]) {
-		Store b = new Store();
+		Store store = new Store();
 	}
 }
