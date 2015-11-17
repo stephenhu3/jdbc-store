@@ -438,6 +438,8 @@ public class Store implements ActionListener {
 		ResultSet rs;
 		PreparedStatement ps;
 
+		System.out.print("\nTextbooks with less than 10 stock that have sold over 50 copies in the last week: \n");
+
 		try {
 			ps = con.prepareStatement("DROP VIEW recentBookSales");	
 				
@@ -500,7 +502,7 @@ public class Store implements ActionListener {
 			for (int i = 0; i < numCols; i++) {
 				// get column name and print it
 
-				System.out.printf("%-15s", rsmd.getColumnName(i + 1));
+				System.out.printf("%-45s", rsmd.getColumnName(i + 1));
 			}
 
 			System.out.println(" ");
@@ -512,13 +514,13 @@ public class Store implements ActionListener {
 				// simplified output formatting; truncation may occur
 
 				upc = rs.getString("upc");
-				System.out.printf("%-15s", upc);
+				System.out.printf("%-45s", upc);
 
 				title = rs.getString("title");
-				System.out.printf("%-15s", title);
+				System.out.printf("%-45s", title);
 
 				publisher = rs.getString("publisher");
-				System.out.printf("\n%-15s", publisher);
+				System.out.printf("%-45s\n", publisher);
 			}
 
 			// close the statement; 
@@ -541,6 +543,8 @@ public class Store implements ActionListener {
 		ResultSet rs;
 		Statement stmt;
 		PreparedStatement ps;
+
+		System.out.print("\nTop three grossing items sold last week: \n");
 
 		try {
 			ps = con.prepareStatement("DROP VIEW recentSales");	
@@ -641,7 +645,7 @@ public class Store implements ActionListener {
 				System.out.printf("%-15d", stock);
 
 				taxable = rs.getString("taxable");
-				System.out.printf("\n%-15s", taxable);
+				System.out.printf("%-15s\n", taxable);
 			}
 
 			// close the statement; 
