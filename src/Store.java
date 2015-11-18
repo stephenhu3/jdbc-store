@@ -126,7 +126,7 @@ public class Store implements ActionListener {
 	 * connects to Oracle database named ug using user supplied username and password
 	 */
 	private boolean connect(String username, String password) {
-		String connectURL = "jdbc:oracle:thin:@localhost:1522:ug";
+		String connectURL = "jdbc:oracle:thin:@dbhost.ugrad.cs.ubc.ca:1522:ug";
 
 
 		try {
@@ -297,6 +297,7 @@ public class Store implements ActionListener {
 		}
 	}
 
+
 	/*
 	 * Deletes an item if stock is zero
 	 */
@@ -365,6 +366,7 @@ public class Store implements ActionListener {
 		}
 	}
 
+
 	/*
 	 * Display information about items
 	 */
@@ -424,6 +426,7 @@ public class Store implements ActionListener {
 			System.out.println("Message: " + ex.getMessage());
 		}
 	}
+
 
 	/*
 	 * Display list of textbooks satisfying these conditions:
@@ -531,6 +534,7 @@ public class Store implements ActionListener {
 		}
 	}
 
+
 	/*
 	 * Display the top three items sold last week with respect to total sales amount
 	 */
@@ -584,6 +588,24 @@ public class Store implements ActionListener {
 			ps.executeUpdate();
 			con.commit();
 
+			ps = con.prepareStatement("DROP VIEW topTotalGrossing");
+				
+			try {
+				ps.executeUpdate();
+			} catch (SQLException ex) {
+				con.commit();		
+			}
+
+			ps = con.prepareStatement(
+				"CREATE VIEW topTotalGrossing AS "
+				+ "SELECT upc, SUM(amount_grossed) AS total_amount_grossed "
+				+ "FROM topGrossing "
+				+ "GROUP BY upc "
+				+ "ORDER BY total_amount_grossed DESC"
+			);
+			ps.executeUpdate();
+			con.commit();
+
 			ps = con.prepareStatement("DROP VIEW topThreeGrossing");
 				
 			try {
@@ -595,7 +617,7 @@ public class Store implements ActionListener {
 			ps = con.prepareStatement(
 				"CREATE VIEW topThreeGrossing AS "
 				+ "SELECT * "
-				+ "FROM topGrossing "
+				+ "FROM topTotalGrossing "
 				+ "WHERE ROWNUM <= 3"
 			);
 			ps.executeUpdate();
@@ -604,7 +626,7 @@ public class Store implements ActionListener {
 			stmt = con.createStatement();
 
 			rs = stmt.executeQuery(
-				"SELECT t.amount_grossed AS totalSales, f.upc, f.sellingPrice, f.stock, f.taxable "
+				"SELECT t.total_amount_grossed AS totalSales, f.upc, f.sellingPrice, f.stock, f.taxable "
 				+ "FROM item f, topThreeGrossing t "
 				+ "WHERE f.upc = t.upc"
 			);
@@ -655,6 +677,7 @@ public class Store implements ActionListener {
 			System.out.println("Message: " + ex.getMessage());
 		}
 	}
+
 
 	public static void main(String args[]) {
 		Store store = new Store();
